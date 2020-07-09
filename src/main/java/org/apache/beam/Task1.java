@@ -16,6 +16,7 @@ import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.*;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 
 public class Task1 {
@@ -99,10 +100,10 @@ public class Task1 {
                                      c.output(errorTag, errorRecord(element, String.format("age less then 20 (\"%s\" actual: %s)", userName, age)));
                                  } else if (!isGmail(email)) {
                                      c.output(errorTag, errorRecord(element, String.format("it is not Gmail (\"%s\" actual: %s)", userName, email)));
-                                 } else if (sideInputData != null) {
+                                 } else if (sideInputData == null) {
                                      c.output(resultTag, resultRecord(element, UNKNOWN, getShortUserName(email)));
                                  } else {
-                                     c.output(resultTag, resultRecord(element, (String) sideInputData.get(Field.AGE_STRING.getName()), getShortUserName(email)));
+                                     c.output(resultTag, resultRecord(element, sideInputData.get(Field.AGE_STRING.getName()).toString(), getShortUserName(email)));
                                  }
                              }
 
@@ -150,18 +151,6 @@ public class Task1 {
 
         PCollection<GenericRecord> successResult = result.get(resultTag).setCoder(AvroCoder.of(AvroUtils.toAvroSchema(RESULT_SCHEMA)));
         PCollection<GenericRecord> errorResult = result.get(errorTag).setCoder(AvroCoder.of(AvroUtils.toAvroSchema(ERROR_SCHEMA)));
-
-        errorResult.apply(
-                "Log",
-                ParDo.of(
-                        new DoFn<GenericRecord, Void>() {
-                            @ProcessElement
-                            public void processElement(ProcessContext c) {
-                                System.out.println(c.element());
-                            }
-                        }
-                )
-        );
 
         successResult.apply("WriteResult", AvroIO.writeGenericRecords(AvroUtils.toAvroSchema(RESULT_SCHEMA)).to(options.getOutput()));
         errorResult.apply("WriteErrorResult", AvroIO.writeGenericRecords(AvroUtils.toAvroSchema(ERROR_SCHEMA)).to(options.getErrorOutput()));
